@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import numpy as np
 
 #
 # ContourComparison
@@ -68,14 +69,18 @@ class ContourComparisonWidget(ScriptedLoadableModuleWidget):
     # imageThreshold = self.ui.imageThresholdSliderWidget.value
     # logic.run(self.ui.inputSelector.currentNode(), self.ui.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
 
-    firstFiducialNode = self.ui.firstFiducialSelector.currentNode()
-    secondFiducialNode = self.ui.secondFiducialSelector.currentNode()
+    samplingDistance = self.ui.samplingDistanceSliderWidget.value
 
-    if firstFiducialNode is None or secondFiducialNode is None:
+
+    firstCurveNode = self.ui.firstFiducialSelector.currentNode()
+    secondCurveNode = self.ui.secondFiducialSelector.currentNode()
+
+    if firstCurveNode is None or secondCurveNode is None:
       logging.warning("You need to select both fiducials!")
       return
 
-    logic.createContours(firstFiducialNode, secondFiducialNode)
+    logic.computeMetrics(firstCurveNode, secondCurveNode, samplingDistance)
+
 
 #
 # ContourComparisonLogic
@@ -91,54 +96,34 @@ class ContourComparisonLogic(ScriptedLoadableModuleLogic):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
-  def createContours(self, firstFidcialNode, secondFiducialNode):
+  def computeMetrics(self, firstCurveNode, secondCurveNode, samplingDistance):
+    originalFirstCurvePoints = firstCurveNode.GetCurvePointsWorld()
+    originalSecondCurvePoints = secondCurveNode.GetCurvePointsWorld()
 
-    firstMarkupsToModelNode = slicer.util.getFirstNodeByName('FirstContourNode', 'vtkMRMLMarkupsToModelNode')
-    if firstMarkupsToModelNode is None:
-      firstMarkupsToModelNode = slicer.vtkMRMLMarkupsToModelNode()
-      firstMarkupsToModelNode.SetName('FirstContourNode')
-      slicer.mrmlScene.AddNode(firstMarkupsToModelNode)
+    interpolatedFirstPoints = vtk.vtkPoints()
+    interpolatedSecondPoints = vtk.vtkPoints()
 
-    firstMarkupsToModelNode.SetAndObserveInputNodeID(firstFidcialNode.GetID())
+    firstCurveNode.ResamplePoints(originalFirstCurvePoints, interpolatedFirstPoints, samplingDistance, True)
+    secondCurveNode.ResamplePoints(originalSecondCurvePoints, interpolatedSecondPoints, samplingDistance, True)
 
-    firstCurve =  slicer.util.getFirstNodeByName('FirstCurveModel', 'vtkMRMLModelNode')
-    if firstCurve is None:
-      firstCurve = slicer.vtkMRMLModelNode()
-      slicer.mrmlScene.AddNode(firstCurve)
-      firstCurve.SetName("FirstCurveModel")
-      display = slicer.vtkMRMLModelDisplayNode()
-      slicer.mrmlScene.AddNode(display)
-      firstCurve.SetAndObserveDisplayNodeID(display.GetID())
-      display.SetColor(1,1,0)
+    minDistances = np.zeros(interpolatedFirstPoints.GetNumberOfPoints())
 
-    firstMarkupsToModelNode.SetAndObserveOutputModelNodeID(firstCurve.GetID())
-    firstMarkupsToModelNode.SetModelType(firstMarkupsToModelNode.Curve)
-    firstMarkupsToModelNode.SetCurveType(firstMarkupsToModelNode.CardinalSpline)
-    firstMarkupsToModelNode.SetTubeRadius(1.0)
+    for i in range(interpolatedFirstPoints.GetNumberOfPoints()):
+      minDistances[i] = 1000000.0
+      for j in range(interpolatedSecondPoints.GetNumberOfPoints()):
+        firstCurvePoint = interpolatedFirstPoints.GetData().GetTuple(i)
+        secondCurvePoint = interpolatedSecondPoints.GetData().GetTuple(j)
+        d = np.linalg.norm(np.array(firstCurvePoint) - np.array(secondCurvePoint))
+        if d < minDistances[i]:
+          minDistances[i] = d
+
+    print("max distance = {}".format(minDistances.max()))
+    print("min distance = {}".format(minDistances.min()))
+    print("average distance = {}".format(np.mean(minDistances)))
 
 
-    secondMarkupsToModelNode = slicer.util.getFirstNodeByName('SecondContourNode', 'vtkMRMLMarkupsToModelNode')
-    if secondMarkupsToModelNode is None:
-      secondMarkupsToModelNode = slicer.vtkMRMLMarkupsToModelNode()
-      secondMarkupsToModelNode.SetName('SecondContourNode')
-      slicer.mrmlScene.AddNode(secondMarkupsToModelNode)
 
-    secondMarkupsToModelNode.SetAndObserveInputNodeID(secondFiducialNode.GetID())
 
-    secondCurve =  slicer.util.getFirstNodeByName('SecondCurveModel', 'vtkMRMLModelNode')
-    if secondCurve is None:
-      secondCurve = slicer.vtkMRMLModelNode()
-      slicer.mrmlScene.AddNode(secondCurve)
-      secondCurve.SetName("SecondCurveModel")
-      display = slicer.vtkMRMLModelDisplayNode()
-      slicer.mrmlScene.AddNode(display)
-      secondCurve.SetAndObserveDisplayNodeID(display.GetID())
-      display.SetColor(1,0,1)
-
-    secondMarkupsToModelNode.SetAndObserveOutputModelNodeID(secondCurve.GetID())
-    secondMarkupsToModelNode.SetModelType(secondMarkupsToModelNode.Curve)
-    secondMarkupsToModelNode.SetCurveType(secondMarkupsToModelNode.CardinalSpline)
-    secondMarkupsToModelNode.SetTubeRadius(1.0)
 
 
   def hasImageData(self,volumeNode):

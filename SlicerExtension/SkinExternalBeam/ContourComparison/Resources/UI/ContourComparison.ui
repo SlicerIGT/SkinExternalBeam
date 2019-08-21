@@ -25,7 +25,7 @@
      </property>
      <property name="nodeTypes">
       <stringlist>
-       <string>vtkMRMLMarkupsFiducialNode</string>
+       <string>vtkMRMLMarkupsClosedCurveNode</string>
       </stringlist>
      </property>
      <property name="showChildNodeTypes">
@@ -62,7 +62,7 @@
      </property>
      <property name="nodeTypes">
       <stringlist>
-       <string>vtkMRMLMarkupsFiducialNode</string>
+       <string>vtkMRMLMarkupsClosedCurveNode</string>
       </stringlist>
      </property>
      <property name="showChildNodeTypes">
@@ -82,26 +82,29 @@
    <item row="2" column="0">
     <widget class="QLabel" name="label_3">
      <property name="text">
-      <string>Image threshold:</string>
+      <string>Sampling distance (mm):</string>
      </property>
     </widget>
    </item>
    <item row="2" column="1">
-    <widget class="ctkSliderWidget" name="imageThresholdSliderWidget">
+    <widget class="ctkSliderWidget" name="samplingDistanceSliderWidget">
      <property name="toolTip">
       <string>Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.</string>
      </property>
      <property name="singleStep">
-      <double>0.100000000000000</double>
+      <double>0.500000000000000</double>
+     </property>
+     <property name="pageStep">
+      <double>2.000000000000000</double>
      </property>
      <property name="minimum">
-      <double>-100.000000000000000</double>
+      <double>0.000000000000000</double>
      </property>
      <property name="maximum">
-      <double>100.000000000000000</double>
+      <double>10.000000000000000</double>
      </property>
      <property name="value">
-      <double>0.500000000000000</double>
+      <double>1.000000000000000</double>
      </property>
     </widget>
    </item>
