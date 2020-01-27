@@ -52,6 +52,7 @@ class ContourComparisonWidget(ScriptedLoadableModuleWidget):
 
     # connections
     self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
+    self.ui.createMarginButton.connect('clicked(bool)', self.onCreateMarginButton)
     # self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     # self.ui.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
@@ -63,6 +64,13 @@ class ContourComparisonWidget(ScriptedLoadableModuleWidget):
 
   def cleanup(self):
     pass
+
+  def onCreateMarginButton(self):
+    logic = ContourComparisonLogic()
+    secondCurveNode = self.ui.secondFiducialSelector.currentNode()
+    radius = self.ui.marginSliderWidget.value
+    logic.createMarginModel(secondCurveNode, radius, "ContourMargin")
+
 
   def onApplyButton(self):
     logic = ContourComparisonLogic()
@@ -122,8 +130,43 @@ class ContourComparisonLogic(ScriptedLoadableModuleLogic):
     print("average distance = {}".format(np.mean(minDistances)))
 
 
+  def createMarginModel(self, curveNode, radius, modelNodeName):
+    originalCurvePoints = curveNode.GetCurvePointsWorld()
+    interpolatedPoints = vtk.vtkPoints()
+    curveNode.ResamplePoints(originalCurvePoints, interpolatedPoints, 3.0, True)
 
+    # Create a temporary fiducial list for MarkupsToModel input
 
+    tempFiducialNode = slicer.util.getFirstNodeByName("TempFiducialNode")
+    if tempFiducialNode is None:
+      tempFiducialNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
+      tempFiducialNode.SetName("TempFiducialNode")
+      tempFiducialNode.GetDisplayNode().SetVisibility(False)
+
+    for i in range(interpolatedPoints.GetNumberOfPoints()):
+      curvePoint = interpolatedPoints.GetData().GetTuple(i)
+      tempFiducialNode.AddFiducial(curvePoint[0], curvePoint[1], curvePoint[2])
+
+    markupsToModelNode = slicer.util.getFirstNodeByName("MarginMarkupsToModelNode")
+    if markupsToModelNode is None:
+      markupsToModelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsToModelNode")
+      markupsToModelNode.SetName("MarginMarkupsToModelNode")
+
+    marginModelNode = slicer.util.getFirstNodeByName(modelNodeName)
+    if marginModelNode is None:
+      marginModelNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+      marginModelNode.SetName(modelNodeName)
+      marginModelNode.CreateDefaultDisplayNodes()
+      marginModelNode.GetDisplayNode().SetColor(1,1,0)
+      marginModelNode.GetDisplayNode().SetOpacity(0.3)
+
+    markupsToModelNode.SetAndObserveInputNodeID(tempFiducialNode.GetID())
+    markupsToModelNode.SetAndObserveOutputModelNodeID(marginModelNode.GetID())
+    markupsToModelNode.SetModelType(slicer.vtkMRMLMarkupsToModelNode.Curve)
+    markupsToModelNode.SetCurveType(slicer.vtkMRMLMarkupsToModelNode.CardinalSpline)
+    markupsToModelNode.SetTubeRadius(radius)
+    markupsToModelNode.SetTubeNumberOfSides(12)
+    markupsToModelNode.SetTubeLoop(True)
 
 
   def hasImageData(self,volumeNode):
