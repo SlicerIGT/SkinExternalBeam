@@ -142,6 +142,8 @@ class ContourComparisonLogic(ScriptedLoadableModuleLogic):
       tempFiducialNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsFiducialNode")
       tempFiducialNode.SetName("TempFiducialNode")
       tempFiducialNode.GetDisplayNode().SetVisibility(False)
+    else:
+      tempFiducialNode.RemoveAllMarkups()
 
     for i in range(interpolatedPoints.GetNumberOfPoints()):
       curvePoint = interpolatedPoints.GetData().GetTuple(i)
